@@ -20,14 +20,19 @@ namespace SOUI
 {
 
     struct IAcceleratorMgr;
-
+    
+    enum{
+    ZORDER_MIN  = 0,
+    ZORDER_MAX  = (UINT)-1,
+    };
+    
     /**
     * @struct     ITimelineHandler
     * @brief      时间轴处理接口
     * 
     * Describe    
     */
-    struct SOUI_EXP ITimelineHandler
+    struct ITimelineHandler
     {
         virtual void OnNextFrame()=0;
     };
@@ -38,10 +43,8 @@ namespace SOUI
     * 
     * Describe    
     */
-    class SOUI_EXP ISwndContainer : public ITimelineHandler
+    struct ISwndContainer : public ITimelineHandler
     {
-        friend class SWindow;
-    public:
         virtual BOOL RegisterDragDrop(SWND swnd,IDropTarget *pDropTarget)=0;
 
         virtual BOOL RevokeDragDrop(SWND swnd)=0;
@@ -88,7 +91,17 @@ namespace SOUI
 
         virtual BOOL UnregisterTimelineHandler(ITimelineHandler *pHandler)=0;
 
+        virtual BOOL RegisterTrackMouseEvent(SWND swnd)=0;
+
+        virtual BOOL UnregisterTrackMouseEvent(SWND swnd)=0;
+
         virtual SMessageLoop * GetMsgLoop() =0;
+
+        //标记窗口树的zorder失效
+        virtual void MarkWndTreeZorderDirty() = 0;
+
+        //重建窗口树的zorder
+        virtual void BuildWndTreeZorder() = 0;
     };
 
 

@@ -360,7 +360,11 @@ void STreeBox::LoadBranch(HSTREEITEM hParent,pugi::xml_node xmlItem)
         HSTREEITEM hItem=InsertItem(xmlItem,dwData,hParent);
 
         pugi::xml_node xmlChild=xmlItem.child(L"item");
-        if(xmlChild) LoadBranch(hItem,xmlChild);
+        if(xmlChild)
+        {
+            LoadBranch(hItem,xmlChild);
+            Expand(hItem,xmlItem.attribute(L"expand").as_bool(true)?TVE_EXPAND:TVE_COLLAPSE);
+        }
 
         xmlItem=xmlItem.next_sibling(L"item");
     }
@@ -424,13 +428,12 @@ void STreeBox::RedrawItem(HSTREEITEM hItem)
         rcItem.OffsetRect(m_rcClient.TopLeft());
 
         IRenderTarget *pRT=GetRenderTarget(&rcItem,OLEDC_PAINTBKGND);
-        SPainter painter;
-        BeforePaint(pRT,painter);
+        CRect rcClip;
+        pRT->GetClipBox(&rcClip);
 
         SSendMessage(WM_ERASEBKGND,(WPARAM)(HDC)pRT);
         DrawItem(pRT,rcItem,hItem);
 
-        AfterPaint(pRT,painter);
         ReleaseRenderTarget(pRT);
     }
 }
@@ -461,7 +464,7 @@ void STreeBox::OnPaint(IRenderTarget *pRT)
     
     CAutoRefPtr<IRegion> pClipRgn;
     pRT->GetClipRegion(&pClipRgn);
-
+    
     int iFirstVisible=m_ptOrigin.y/m_nItemHei;
     int nPageItems=(m_rcClient.Height()+m_nItemHei-1)/m_nItemHei+1;
 

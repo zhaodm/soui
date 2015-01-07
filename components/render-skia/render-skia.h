@@ -52,6 +52,8 @@ namespace SOUI
 
 		}
 
+        virtual ~TSkiaRenderObjImpl(){}
+
 		virtual IRenderFactory * GetRenderFactory() const
 		{
 			return m_pRenderFactory;
@@ -120,6 +122,12 @@ namespace SOUI
             m_skPaint.setLCDRenderText(true);
             
 		}
+
+        virtual ~SFont_Skia()
+        {
+            if(m_skFont) m_skFont->unref();
+        }
+
         virtual const LOGFONT * LogFont() const {return &m_lf;}
 
         virtual LPCTSTR FamilyName()
@@ -306,6 +314,7 @@ namespace SOUI
         virtual HRESULT DrawBitmap9Patch(LPCRECT pRcDest,IBitmap *pBitmap,LPCRECT pRcSrc,LPCRECT pRcSourMargin,EXPEND_MODE expendMode,BYTE byAlpha=0xFF);
 
 		virtual IRenderObj * GetCurrentObject(OBJTYPE uType);
+        virtual HRESULT SelectDefaultObject(OBJTYPE uType,IRenderObj ** ppOldObj = NULL);
         virtual HRESULT SelectObject(IRenderObj *pObj,IRenderObj ** ppOldObj = NULL);
 
 
@@ -338,6 +347,12 @@ namespace SOUI
     
         SkPoint         m_ptOrg;
         
+        //注意保存4个默认的RenderObject对象
+        CAutoRefPtr<IBitmap> m_defBmp;
+        CAutoRefPtr<IPen> m_defPen;
+        CAutoRefPtr<IBrush> m_defBrush;
+        CAutoRefPtr<IFont> m_defFont;
+
         HDC m_hGetDC;
         UINT m_uGetDCFlag;
 	};

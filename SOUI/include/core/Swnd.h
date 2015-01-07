@@ -21,10 +21,11 @@
 #include "event/EventSubscriber.h"
 #include "event/events.h"
 #include "event/EventSet.h"
-#include <OCIdl.h>
 #include "SwndLayout.h"
 #include "res.mgr/SStylePool.h"
 #include "res.mgr/SSkinPool.h"
+
+#include <OCIdl.h>
 
 #define SC_WANTARROWS     0x0001      /* Control wants arrow keys         */
 #define SC_WANTTAB        0x0002      /* Control wants tab keys           */
@@ -43,6 +44,8 @@ namespace SOUI
     enum {NormalShow=0,ParentShow=1};    //提供WM_SHOWWINDOW消息识别是父窗口显示还是要显示本窗口
     enum {NormalEnable=0,ParentEnable=1};    //提供WM_ENABLE消息识别是父窗口可用还是直接操作当前窗口
 
+    
+    #define UM_UPDATESWND (WM_USER+2000)    //发送到宿主窗口的请求刷新非背景混合窗口的自定义消息, wParam:SWND
 
     class STimerID
     {
@@ -141,8 +144,10 @@ namespace SOUI
         , public TObjRefImpl2<IObjRef,SWindow>
     {
         SOUI_CLASS_NAME(SWindow, L"window")
-        friend class SwndLayout;
+        friend class SwndLayoutBuilder;
         friend class SWindowRepos;
+        friend class SHostWnd;
+        friend class SwndContainerImpl;
     public:
         SWindow();
 
@@ -284,7 +289,9 @@ namespace SOUI
          *
          * Describe  
          */
-        SWindow *GetTopLevelParent();
+        SWindow * GetTopLevelParent();
+        
+        SWindow * GetRoot(){return GetTopLevelParent();}
         
         /**
          * GetChildrenCount
@@ -361,7 +368,7 @@ namespace SOUI
             SWindow *pTarget = FindChildByID(nID,nDeep);
             if(!pTarget || !pTarget->IsClass(T::GetClassName()))
             {
-                SASSERT(pTarget);
+                SASSERT_FMTW(FALSE,L"FindChildByID2 Failed, no window of class [%s] with id of [%d] was found within [%d] levels",T::GetClassName(),nID,nDeep);
                 return NULL;
             }
             return (T*)pTarget;
@@ -398,7 +405,7 @@ namespace SOUI
             SWindow *pTarget = FindChildByName(pszName,nDeep);
             if(!pTarget || !pTarget->IsClass(T::GetClassName()))
             {
-                SASSERT(pTarget);
+                SASSERT_FMTW(FALSE,L"FindChildByName2 Failed, no window of class [%s] with name of [%s] was found within [%d] levels",T::GetClassName(),pszName,nDeep);
                 return NULL;
             }
             return (T*)pTarget;
@@ -645,7 +652,7 @@ namespace SOUI
         * @param    const CRect & rcNew --  新位置
         * @return   void 
         *
-        * Describe  
+        * Describe  窗口位置发生变化,更新窗口及计算子窗口位置
         */
         virtual void OnRelayout(const CRect &rcOld, const CRect & rcNew);
         
@@ -657,6 +664,14 @@ namespace SOUI
         * Describe  
         */
         virtual CRect GetChildrenLayoutRect();
+
+        /**
+         * GetLayout
+         * @brief    获得当前窗口的布局对象
+         * @return   const SwndPosition * -- 布局对象指针
+         * Describe  
+         */    
+        virtual const SwndLayout * GetLayout() const;
 
         /**
         * GetDesiredSize
@@ -732,6 +747,7 @@ namespace SOUI
         * Describe  
         */
         virtual void AfterPaint(IRenderTarget *pRT, SPainter &painter);
+        
     public://render相关方法
         /**
         * RedrawRegion
@@ -845,7 +861,7 @@ namespace SOUI
         * @return   bool -- true绘制到cache上。
         * Describe  
         */    
-        bool IsDrawToCache() const {return m_bCacheDraw || m_style.m_byAlpha!=0xFF;}
+        bool IsDrawToCache() const;
 
         /**
         * GetCachedRenderTarget
@@ -853,30 +869,57 @@ namespace SOUI
         * @return   IRenderTarget * -- Cache窗口内容的RenderTarget
         * Describe  
         */    
-        IRenderTarget * GetCachedRenderTarget(){return m_cachedRT;}
+        IRenderTarget * GetCachedRenderTarget();
 
+        /**
+         * IsLayeredWindow
+         * @brief    确定渲染时子窗口的内容是不是渲染到当前窗口的缓存上
+         * @return   BOOL -- TREU:子窗口的内容先渲染到this的缓存RT上
+         * Describe  
+         */    
+        BOOL IsLayeredWindow();
 
     protected://helper functions
 
+        void _Update();
+        
+    
         /**
-        * GetNextVisibleWindow
-        * @brief    获得指定窗口的下一个可见窗口
-        * @param    SWindow * pWnd --  参考窗口
-        * @param    const CRect & rcDraw --  目标矩形
-        * @return   SWindow * 下一个可见窗口
+         * _GetCurrentRenderContainer
+         * @brief    获得当前窗口所属的渲染层宿主窗口
+         * @return   SWindow * -- 渲染层宿主窗口
+         * Describe  
+         */    
+        SWindow * _GetCurrentLayeredWindow();
+
+        /**
+        * _GetRenderTarget
+        * @brief    获取一个与SWND窗口相适应的内存DC
+        * @param  [in,out]  CRect & rcGetRT --  RT范围,保存最后的有效绘制区
+        * @param    DWORD gdcFlags --  同OLEDCFLAGS
+        * @param    BOOL bClientDC --  限制在client区域
+        * @return   IRenderTarget * 
+        *
+        * Describe  使用ReleaseRenderTarget释放
+        */
+        IRenderTarget * _GetRenderTarget(CRect & rcGetRT,DWORD gdcFlags,UINT uMinFrgndZorder,IRegion *pRgn);
+
+
+        /**
+        * _ReleaseRenderTarget
+        * @brief    
+        * @param    IRenderTarget * pRT --  释放由GetRenderTarget获取的RT
+        * @return   void 
         *
         * Describe  
         */
-        static SWindow *GetNextVisibleWindow(SWindow *pWnd,const CRect &rcDraw);
+        void _ReleaseRenderTarget(IRenderTarget *pRT);
 
-        enum PRSTATE{
-            PRS_LOOKSTART=0,    //查找开始窗口
-            PRS_DRAWING,        //窗口渲染中
-            PRS_MEETEND         //碰到指定的结束窗口
-        };
-
-        static  BOOL _PaintRegion( IRenderTarget *pRT, IRegion *pRgn,SWindow *pWndCur,SWindow *pStart,SWindow *pEnd,PRSTATE & prState );
-        static void _BeforePaintEx(SWindow *pWnd,IRenderTarget *pRT);
+        //将窗口内容绘制到RenderTarget上
+        void _PaintWindowClient(IRenderTarget *pRT);
+        void _PaintWindowNonClient(IRenderTarget *pRT);
+        void _PaintRegion(IRenderTarget *pRT, IRegion *pRgn,UINT iZorderBegin,UINT iZorderEnd);
+        void _PaintRegion2(IRenderTarget *pRT, IRegion *pRgn,UINT iZorderBegin,UINT iZorderEnd);
 
         void DrawDefFocusRect(IRenderTarget *pRT,CRect rc);
         void DrawAniStep(CRect rcFore,CRect rcBack,IRenderTarget *pRTFore,IRenderTarget * pRTBack,CPoint ptAnchor);
@@ -969,7 +1012,7 @@ namespace SOUI
         HRESULT OnAttrAlpha(const SStringW& strValue, BOOL bLoading);
         HRESULT OnAttrSkin(const SStringW& strValue, BOOL bLoading);
         HRESULT OnAttrClass(const SStringW& strValue, BOOL bLoading);
-
+        HRESULT OnAttrTrackMouseEvent(const SStringW& strValue, BOOL bLoading);
 
         SOUI_ATTRS_BEGIN()
             ATTR_INT(L"id",m_nID,FALSE)
@@ -987,18 +1030,19 @@ namespace SOUI
             ATTR_CUSTOM(L"pos2type", OnAttrPos2type)
             ATTR_CUSTOM(L"cache", OnAttrCache)
             ATTR_CUSTOM(L"alpha",OnAttrAlpha)
+            ATTR_CUSTOM(L"trackMouseEvent",OnAttrTrackMouseEvent)
             ATTR_I18NSTRT(L"tip", m_strToolTipText, FALSE)  //使用语言包翻译
             ATTR_INT(L"msgTransparent", m_bMsgTransparent, FALSE)
             ATTR_INT(L"maxWidth",m_nMaxWidth,FALSE)
             ATTR_INT(L"clipClient",m_bClipClient,FALSE)
             ATTR_INT(L"focusable",m_bFocusable,FALSE)
-            ATTR_INT(L"sep", m_layout.nSepSpace, FALSE)
             ATTR_CHAIN(m_style)                     //支持对style中的属性定制
         SOUI_ATTRS_END()
         
     protected:
         SWND                m_swnd;             /**< 窗口句柄 */
         CRect               m_rcWindow;         /**< 窗口在容器中的位置 */
+        BOOL                m_bFloat;           /**< 窗口位置固定不动的标志 */
 
         ISwndContainer *    m_pContainer;       /**< 容器对象 */
         SEventSet           m_evtSet;           /**< 窗口事件集合 */
@@ -1018,6 +1062,7 @@ namespace SOUI
         SStringT            m_strToolTipText;   /**< 窗口ToolTip */
         SStringW            m_strName;          /**< 窗口名称 */
         int                 m_nID;              /**< 窗口ID */
+        UINT                m_uZorder;          /**< 窗口Zorder */
 
         DWORD               m_dwState;          /**< 窗口在渲染过程中的状态 */
         DWORD               m_bVisible:1;       /**< 窗口可见状态 */
@@ -1034,15 +1079,22 @@ namespace SOUI
         ISkinObj *          m_pNcSkin;          /**< 非客户区skin */
         ULONG_PTR           m_uData;            /**< 窗口的数据位,可以通过GetUserData获得 */
 
-        SwndLayout          m_layout;           /**< 布局对象 */
+        SwndLayout        m_layout;             /**< 布局对象 */
         int                 m_nMaxWidth;        /**< 自动计算大小时，窗口的最大宽度 */
 
         CAutoRefPtr<IRenderTarget> m_cachedRT;  /**< 缓存窗口绘制的RT */
         
-        CRect               m_rcGetRT;
-        DWORD               m_gdcFlags;
-        BOOL                m_bClipRT;
-
+        typedef struct GETRTDATA
+        {
+            CRect rcRT;             /**< GETRT调用的有效范围 */
+            DWORD gdcFlags;         /**< GETRT绘制标志位 */
+            UINT  uMinFrgndZorder;  /**< GETRT时前景开始的zorder */
+            CAutoRefPtr<IRegion> rgn;/**< 保存一个和rcRT对应的IRegion对象 */
+        } * PGETRTDATA;
+        
+        PGETRTDATA m_pGetRTData;
+        
+        CAutoRefPtr<IRegion>    m_invalidRegion;/**< 非背景混合窗口的脏区域 */
 #ifdef _DEBUG
         DWORD               m_nMainThreadId;    /**< 窗口宿线程ID */
 #endif

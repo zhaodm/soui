@@ -379,8 +379,11 @@ void STreeCtrl::LoadBranch(HSTREEITEM hParent,pugi::xml_node xmlItem)
         HSTREEITEM hItem=InsertItem(xmlItem,hParent);
 
         pugi::xml_node xmlChild=xmlItem.child(L"item");
-        if(xmlChild) LoadBranch(hItem,xmlChild);
-
+        if(xmlChild) 
+        {
+            LoadBranch(hItem,xmlChild);
+            Expand(hItem,xmlItem.attribute(L"expand").as_bool(true)?TVE_EXPAND:TVE_COLLAPSE);
+        }
         xmlItem=xmlItem.next_sibling(L"item");
     }
 }
@@ -762,14 +765,11 @@ void STreeCtrl::RedrawItem(HSTREEITEM hItem)
         if (rcItem.right > rcClient.right) rcItem.right = rcClient.right;
 
         CAutoRefPtr<IRenderTarget> pRT=GetRenderTarget(&rcItem,OLEDC_PAINTBKGND);
-        SPainter painter;
-        BeforePaint(pRT,painter);
 
         SSendMessage(WM_ERASEBKGND,(WPARAM)(void*)pRT);
 
         DrawItem(pRT,rcItem,hItem);
 
-        AfterPaint(pRT,painter);
         ReleaseRenderTarget(pRT);
     }
 }
