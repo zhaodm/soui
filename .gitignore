@@ -26,3 +26,11 @@
 *.exe
 *.out
 *.app
+
+
+Backup
+bin
+obj
+*.sdf
+*.suo
+*.ipch
