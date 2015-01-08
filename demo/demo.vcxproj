@@ -144,6 +144,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\controls.extend\SFadeFrame.cpp" />
     <ClCompile Include="demo.cpp" />
     <ClCompile Include="httpsvr\genericserver.cpp" />
     <ClCompile Include="httpsvr\httpserver.cpp" />
@@ -176,6 +177,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\controls.extend\FileHelper.h" />
+    <ClInclude Include="..\controls.extend\SFadeFrame.h" />
     <ClInclude Include="httpsvr\filereader-i.h" />
     <ClInclude Include="httpsvr\genericserver.h" />
     <ClInclude Include="httpsvr\httpserver.h" />

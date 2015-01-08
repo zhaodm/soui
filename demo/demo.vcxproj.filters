@@ -81,6 +81,9 @@
     <ClCompile Include="..\controls.extend\propgrid\SPropertyItemBase.cpp">
       <Filter>propertygrid</Filter>
     </ClCompile>
+    <ClCompile Include="..\controls.extend\SFadeFrame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\controls.extend\FileHelper.h">
@@ -160,6 +163,9 @@
     </ClInclude>
     <ClInclude Include="..\controls.extend\propgrid\SPropertyItemBase.h">
       <Filter>propertygrid</Filter>
+    </ClInclude>
+    <ClInclude Include="..\controls.extend\SFadeFrame.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
